@@ -10,7 +10,7 @@ In theory, the default swagger that is generated should work, apart from the fol
 ## How to use this tool
 Download this and build it
 
-Specify the URL to the swagger file
+Specify the URL to the swagger file as a command line parameter
 
 The console app will then show the path to the modified file, upload this to the PowerApps service.
 
