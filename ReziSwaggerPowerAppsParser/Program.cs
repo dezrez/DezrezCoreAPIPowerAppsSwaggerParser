@@ -59,7 +59,7 @@ namespace ReziSwaggerPowerAppsParser
 
             List<string> sensitiveEndpoints = new List<string>(new[] { "/api/people/{id}/accounts" });
 
-            List<string> listOfEndpointsToKeep = new List<string>(new[] { "/api/admin/system/ListAgencies", "/api/Job", "api/Negotiator", "api/people/sendnotification", "/api/inboundlead/create", "/api/featureprovisioning/enrollagency" });
+            List<string> listOfEndpointsToKeep = new List<string>(new[] { "/api/admin/system/ListAgencies", "/api/Job", "api/Negotiator", "api/people/sendnotification", "/api/inboundlead/create", "/api/featureprovisioning/enrollagency", "api/agency/apikey", "/api/group/addgroup", "/api/job/SendSystemEmail" });
 
             List<string> listOfEndpointsToRemove = new List<string>(new[] { "/api/admin", "/api/documentgeneration/", "/api/locale/", "/api/chat/", "/api/Job/", "/api/todo", "api/Negotiator/" });
 
@@ -204,6 +204,8 @@ namespace ReziSwaggerPowerAppsParser
 
             foreach (var pathKey in pathKeys)
             {
+                CleansePath((dynamic)swaggerDoc.paths[pathKey]);
+
                 if (!ShouldBeIncluded(includeUrlPrefixes, excludeUrlPrefixes, pathKey))
                 {
                     JObject pathObject = swaggerDoc.paths as JObject;
@@ -211,6 +213,25 @@ namespace ReziSwaggerPowerAppsParser
                     continue;
                 }
             }
+        }
+
+        private static void CleansePath(dynamic path)
+        {
+            string verb = ((JProperty)((JContainer)path).First).Name;
+
+            string currentSummary = path[verb].summary;
+
+            if (currentSummary != null)
+            {
+
+                currentSummary = currentSummary.Replace("/", " ");
+                currentSummary = currentSummary.Replace("\\", " ");
+                currentSummary = currentSummary.Replace("*", " ");
+                currentSummary = currentSummary.Replace(".", " ");
+
+                path[verb].summary = currentSummary;
+            }
+
         }
 
         private static bool ShouldBeIncluded(List<string> includeUrlPrefixes, List<string> excludeUrlPrefixes, string pathKey)
@@ -287,7 +308,7 @@ namespace ReziSwaggerPowerAppsParser
                 //JObject propertyValue = ((JProperty)propertyInfo).Value as JObject;
                 if (propertyInfo.Value.type == "object")
                 {
-                    
+
 
                     if (propertyValue["$ref"] != null)
                     {
