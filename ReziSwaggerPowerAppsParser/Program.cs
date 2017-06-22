@@ -16,7 +16,7 @@ namespace ReziSwaggerPowerAppsParser
         {
             bool forBusinessUse = true;//Signifies if we'll be able to impersonate all agencies etc.
 
-            bool useImplicitFlow = true;//WHen forBusinessUse = true, specifies to use implicitFlow anyway, instead of using client flow.
+            bool useImplicitFlow = true;//WHen forBusinessUse = true, specifies to use implicitFlow anyway, instead of using client flow (as client flow doesnt work yet in PowerApps)
 
             string jsonFileName = args[0];
 
@@ -35,7 +35,7 @@ namespace ReziSwaggerPowerAppsParser
             Uri fileParamUri = new Uri(jsonFileName);
 
             string originalSwaggerFile = Path.Combine(Path.GetTempPath(), $"{fileParamUri.Host}.Swagger.Original.json");
-            
+
             string modifiedSwaggerFile = Path.Combine(Path.GetTempPath(), $"{fileParamUri.Host}.Swagger.Modified.json");
 
             Console.WriteLine($"Downloading {jsonFileName}");
@@ -55,11 +55,18 @@ namespace ReziSwaggerPowerAppsParser
 
             dynamic swaggerDoc = JObject.Parse(File.ReadAllText(modifiedSwaggerFile));
 
-            List<string> listOfEndpointsToKeep = null;// new List<string>(new[] { "/api/admin/system/sendNotificationToAllUsersInAgency" });
+            List<string> nonPowerAppsCompatibleEndpoints = new List<string>(new[] { "/api/admin", "/api/reporting/" });
 
-            //listOfEndpointsToKeep = new List<string>();
+            List<string> sensitiveEndpoints = new List<string>(new[] { "/api/people/{id}/accounts" });
 
-            RemoveEndpoints(swaggerDoc, listOfEndpointsToKeep, null, false);
+            List<string> listOfEndpointsToKeep = new List<string>(new[] { "/api/admin/system/ListAgencies", "/api/Job", "api/Negotiator", "api/people/sendnotification", "/api/inboundlead/create", "/api/featureprovisioning/enrollagency" });
+
+            List<string> listOfEndpointsToRemove = new List<string>(new[] { "/api/admin", "/api/documentgeneration/", "/api/locale/", "/api/chat/", "/api/Job/", "/api/todo", "api/Negotiator/" });
+
+            //Always exclude endpoints that are not compatible with powerapps for some reason
+            listOfEndpointsToRemove.AddRange(nonPowerAppsCompatibleEndpoints);
+
+            RemoveEndpoints(swaggerDoc, listOfEndpointsToKeep, listOfEndpointsToRemove, null, false);
             List<string> remainingPathKeys = ((System.Collections.Generic.IDictionary<string, Newtonsoft.Json.Linq.JToken>)swaggerDoc.paths).Keys.ToList();
 
             RemoveUnreferencedDataContracts(swaggerDoc);
@@ -188,7 +195,7 @@ namespace ReziSwaggerPowerAppsParser
             }
         }
 
-        private static void RemoveEndpoints(dynamic swaggerDoc, List<string> includeUrlPrefixes, List<string> includeOperationIdPrefixes, bool removeUnreferencedContracts)
+        private static void RemoveEndpoints(dynamic swaggerDoc, List<string> includeUrlPrefixes, List<string> excludeUrlPrefixes, List<string> includeOperationIdPrefixes, bool removeUnreferencedContracts)
         {
             List<string> removedPaths = new List<string>();
             List<string> operationIdsToRemove = new List<string>();
@@ -197,27 +204,41 @@ namespace ReziSwaggerPowerAppsParser
 
             foreach (var pathKey in pathKeys)
             {
-                if (includeUrlPrefixes != null)
-                    if (!ContainsAny(pathKey, includeUrlPrefixes))
-                    {
-                        JObject pathObject = swaggerDoc.paths as JObject;
-                        pathObject.Property(pathKey).Remove();
-                        continue;
-                    }
+                if (!ShouldBeIncluded(includeUrlPrefixes, excludeUrlPrefixes, pathKey))
+                {
+                    JObject pathObject = swaggerDoc.paths as JObject;
+                    pathObject.Property(pathKey).Remove();
+                    continue;
+                }
+            }
+        }
 
-                //var pathItem = swaggerDoc.paths[pathKey];
+        private static bool ShouldBeIncluded(List<string> includeUrlPrefixes, List<string> excludeUrlPrefixes, string pathKey)
+        {
 
-                //foreach (var verbKey in ((System.Collections.Generic.IDictionary<string, Newtonsoft.Json.Linq.JToken>)pathItem).Keys)
-                //{
-                //    var operation = pathItem[verbKey];
-                //    string operationId = operation.operationId;
+            if (includeUrlPrefixes == null && excludeUrlPrefixes == null)
+            {
+                return true;
+            }
 
-                //    if (includeOperationIdPrefixes != null)
-                //        if (!ContainsAny(operationId, includeOperationIdPrefixes))
-                //        {
-                //            removedPaths.Add(operationId);
-                //        }
-                //}
+            bool matchesAtLeastOneInclude = includeUrlPrefixes.Any(pf =>
+            {
+                return pathKey.ToLower().Contains(pf.ToLower());
+            });
+
+            bool matchesAtLeastOneExclude = excludeUrlPrefixes.Any(pf =>
+            {
+                return pathKey.ToLower().Contains(pf.ToLower());
+            });
+
+            if (matchesAtLeastOneInclude ^ matchesAtLeastOneExclude || !(matchesAtLeastOneExclude && matchesAtLeastOneInclude))
+            {
+                return matchesAtLeastOneInclude;
+            }
+            else
+            {
+                //The longest pattern that matches wins
+                return GetPatternsThatMatchPath(pathKey, includeUrlPrefixes).OrderBy(s => s.Length).First().Length > GetPatternsThatMatchPath(pathKey, excludeUrlPrefixes).OrderBy(s => s.Length).First().Length;
             }
         }
 
@@ -262,16 +283,18 @@ namespace ReziSwaggerPowerAppsParser
 
             foreach (var propertyInfo in contract.properties)
             {
+                JObject propertyValue = ((JProperty)propertyInfo).Value as JObject;
                 //JObject propertyValue = ((JProperty)propertyInfo).Value as JObject;
                 if (propertyInfo.Value.type == "object")
                 {
-                    JObject propertyValue = ((JProperty)propertyInfo).Value as JObject;
+                    
 
                     if (propertyValue["$ref"] != null)
                     {
                         string contractReference = propertyValue["$ref"].ToString();
                         contractsReferencedByOtherContract.Add(contractReference.Replace("#/definitions/", ""));
                         contractsReferencedByOtherContract.AddRange(GetContractReferencesUsedByThisContractReference(contractReference, swaggerDoc));
+                        continue;
                     }
                 }
 
@@ -284,8 +307,18 @@ namespace ReziSwaggerPowerAppsParser
                         string contractReference = arrayItem["$ref"].ToString();
                         contractsReferencedByOtherContract.Add(contractReference.Replace("#/definitions/", ""));
                         contractsReferencedByOtherContract.AddRange(GetContractReferencesUsedByThisContractReference(contractReference, swaggerDoc));
+                        continue;
                     }
                 }
+
+                if (propertyValue["$ref"] != null)
+                {
+                    string contractReference = propertyValue["$ref"].ToString();
+                    contractsReferencedByOtherContract.Add(contractReference.Replace("#/definitions/", ""));
+                    contractsReferencedByOtherContract.AddRange(GetContractReferencesUsedByThisContractReference(contractReference, swaggerDoc));
+                    continue;
+                }
+
             }
 
             return contractsReferencedByOtherContract;
@@ -380,6 +413,14 @@ namespace ReziSwaggerPowerAppsParser
             });
 
             return match;
+        }
+
+        private static IEnumerable<string> GetPatternsThatMatchPath(string pathKey, List<string> patterns)
+        {
+            return patterns.Where(pf =>
+            {
+                return pathKey.ToLower().Contains(pf.ToLower());
+            });
         }
 
         /*
