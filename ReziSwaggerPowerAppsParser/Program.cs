@@ -59,12 +59,13 @@ namespace ReziSwaggerPowerAppsParser
 
             List<string> sensitiveEndpoints = new List<string>(new[] { "/api/people/{id}/accounts" });
 
-            List<string> listOfEndpointsToKeep = new List<string>(new[] { "/api/admin/system/ListAgencies", "/api/Job", "api/Negotiator", "api/people/sendnotification", "/api/inboundlead/create", "/api/featureprovisioning/enrollagency", "api/agency/apikey", "/api/group/addgroup", "/api/job/SendSystemEmail" });
+            List<string> listOfEndpointsToKeep = new List<string>(new[] { "/api/admin/system/ListAgencies", "/api/", "/api/Job", "api/Negotiator", "api/people/sendnotification", "/api/inboundlead/create", "/api/featureprovisioning/enrollagency", "api/agency/apikey", "/api/group/addgroup", "/api/job/SendSystemEmail" });
 
             List<string> listOfEndpointsToRemove = new List<string>(new[] { "/api/admin", "/api/documentgeneration/", "/api/locale/", "/api/chat/", "/api/Job/", "/api/todo", "api/Negotiator/" });
 
             //Always exclude endpoints that are not compatible with powerapps for some reason
             listOfEndpointsToRemove.AddRange(nonPowerAppsCompatibleEndpoints);
+            listOfEndpointsToRemove.AddRange(sensitiveEndpoints);
 
             RemoveEndpoints(swaggerDoc, listOfEndpointsToKeep, listOfEndpointsToRemove, null, false);
             List<string> remainingPathKeys = ((System.Collections.Generic.IDictionary<string, Newtonsoft.Json.Linq.JToken>)swaggerDoc.paths).Keys.ToList();
