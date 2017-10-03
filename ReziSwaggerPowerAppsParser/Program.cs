@@ -110,7 +110,7 @@ namespace ReziSwaggerPowerAppsParser
         ""in"": ""body"",
         ""description"": ""This is the request body of the Webhook"",
         ""schema"": {{
-            ""$ref"": ""#/definitions/WebhookRequestBody""
+            ""$ref"": ""#/definitions/Dezrez.Core.DataContracts.External.Api.Webhook.CreateWebhookDataContract""
         }}
         }}
     ],
@@ -118,7 +118,7 @@ namespace ReziSwaggerPowerAppsParser
         ""201"": {{
         ""description"": ""Created"",
         ""schema"": {{
-            ""$ref"": ""#/definitions/WebhookCreationResponse""
+            ""type"":""object""
         }}
         }}
     }}
@@ -271,7 +271,7 @@ namespace ReziSwaggerPowerAppsParser
 
             List<string> remainingPathKeys = ((System.Collections.Generic.IDictionary<string, Newtonsoft.Json.Linq.JToken>)swaggerDoc.paths).Keys.ToList();
 
-            //RemoveUnreferencedDataContracts(swaggerDoc);
+            RemoveUnreferencedDataContracts(swaggerDoc);
 
             SetSecurity(swaggerDoc, environmentName, forBusinessUse, useImplicitFlow);
 
@@ -523,8 +523,10 @@ namespace ReziSwaggerPowerAppsParser
             }
         }
 
-        private static IEnumerable<string> GetContractReferencesUsedByThisContractReference(string endpointReferencedContract, dynamic swaggerDoc)
+        private static IEnumerable<string> GetContractReferencesUsedByThisContractReference(string endpointReferencedContract, dynamic swaggerDoc, List<string> referencesAlreadyAccountedFor = null)
         {
+            referencesAlreadyAccountedFor = referencesAlreadyAccountedFor ?? new List<string>();
+
             List<string> contractsReferencedByOtherContract = new List<string>();
             endpointReferencedContract = endpointReferencedContract.Replace("#/definitions/", "");
             var contract = swaggerDoc.definitions[endpointReferencedContract];
@@ -540,8 +542,12 @@ namespace ReziSwaggerPowerAppsParser
                     if (propertyValue["$ref"] != null)
                     {
                         string contractReference = propertyValue["$ref"].ToString();
-                        contractsReferencedByOtherContract.Add(contractReference.Replace("#/definitions/", ""));
-                        contractsReferencedByOtherContract.AddRange(GetContractReferencesUsedByThisContractReference(contractReference, swaggerDoc));
+                        string standardContractReference = contractReference.Replace("#/definitions/", "");
+                        if (!contractsReferencedByOtherContract.Union(referencesAlreadyAccountedFor).ToList().Contains(standardContractReference))
+                        {
+                            contractsReferencedByOtherContract.Add(standardContractReference);
+                            contractsReferencedByOtherContract.AddRange(GetContractReferencesUsedByThisContractReference(contractReference, swaggerDoc, contractsReferencedByOtherContract.Union(referencesAlreadyAccountedFor).ToList()));
+                        }
                         continue;
                     }
                 }
@@ -553,8 +559,12 @@ namespace ReziSwaggerPowerAppsParser
                     if (arrayItem["$ref"] != null)
                     {
                         string contractReference = arrayItem["$ref"].ToString();
-                        contractsReferencedByOtherContract.Add(contractReference.Replace("#/definitions/", ""));
-                        contractsReferencedByOtherContract.AddRange(GetContractReferencesUsedByThisContractReference(contractReference, swaggerDoc));
+                        string standardContractReference = contractReference.Replace("#/definitions/", "");
+                        if (!contractsReferencedByOtherContract.Union(referencesAlreadyAccountedFor).ToList().Contains(standardContractReference))
+                        {
+                            contractsReferencedByOtherContract.Add(standardContractReference);
+                            contractsReferencedByOtherContract.AddRange(GetContractReferencesUsedByThisContractReference(contractReference, swaggerDoc, contractsReferencedByOtherContract.Union(referencesAlreadyAccountedFor).ToList()));
+                        }
                         continue;
                     }
                 }
@@ -562,8 +572,12 @@ namespace ReziSwaggerPowerAppsParser
                 if (propertyValue["$ref"] != null)
                 {
                     string contractReference = propertyValue["$ref"].ToString();
-                    contractsReferencedByOtherContract.Add(contractReference.Replace("#/definitions/", ""));
-                    contractsReferencedByOtherContract.AddRange(GetContractReferencesUsedByThisContractReference(contractReference, swaggerDoc));
+                    string standardContractReference = contractReference.Replace("#/definitions/", "");
+                    if (!contractsReferencedByOtherContract.Union(referencesAlreadyAccountedFor).ToList().Contains(standardContractReference))
+                    {
+                        contractsReferencedByOtherContract.Add(standardContractReference);
+                        contractsReferencedByOtherContract.AddRange(GetContractReferencesUsedByThisContractReference(contractReference, swaggerDoc, contractsReferencedByOtherContract.Union(referencesAlreadyAccountedFor).ToList()));
+                    }
                     continue;
                 }
 
