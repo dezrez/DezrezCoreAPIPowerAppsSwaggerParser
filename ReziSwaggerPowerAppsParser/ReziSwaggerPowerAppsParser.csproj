@@ -32,6 +32,18 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Dezrez.Core.DataContracts.External">
+      <HintPath>directReferences\Dezrez.Core.DataContracts.External.dll</HintPath>
+    </Reference>
+    <Reference Include="Dezrez.Core.DataContracts.Internal">
+      <HintPath>directReferences\Dezrez.Core.DataContracts.Internal.dll</HintPath>
+    </Reference>
+    <Reference Include="Dezrez.Core.Enums">
+      <HintPath>directReferences\Dezrez.Core.Enums.dll</HintPath>
+    </Reference>
+    <Reference Include="Dezrez.Rezi.Domain">
+      <HintPath>directReferences\Dezrez.Rezi.Domain.dll</HintPath>
+    </Reference>
     <Reference Include="Newtonsoft.Json, Version=10.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\packages\Newtonsoft.Json.10.0.2\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>

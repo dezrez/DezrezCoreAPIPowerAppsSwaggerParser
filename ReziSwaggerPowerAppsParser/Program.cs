@@ -1,11 +1,15 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using Dezrez.Core.DataContracts.Internal.ExternalProviders;
+using Dezrez.Core.DataContracts.Internal.ExternalProviders.EntityChangeSubscribers;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using System.Reflection;
 
 namespace ReziSwaggerPowerAppsParser
 {
@@ -14,13 +18,20 @@ namespace ReziSwaggerPowerAppsParser
 
         static void Main(string[] args)
         {
+            //Add this to the path foreach
+            var newPaths = GetNewPaths();
+
+            var newDescriptions = GetNewDescriptions();
+
+            //Add the definition of the contract
+
             bool forBusinessUse = true;//Signifies if we'll be able to impersonate all agencies etc.
 
             bool useImplicitFlow = true;//WHen forBusinessUse = true, specifies to use implicitFlow anyway, instead of using client flow (as client flow doesnt work yet in PowerApps)
 
             string jsonFileName = args[0];
 
-            string modifiedSwaggerFile = MangleSwagger(forBusinessUse, useImplicitFlow, jsonFileName);
+            string modifiedSwaggerFile = MangleSwagger(forBusinessUse, useImplicitFlow, jsonFileName, newPaths, newDescriptions);
 
             FileInfo finfo = new FileInfo(modifiedSwaggerFile);
 
@@ -29,7 +40,194 @@ namespace ReziSwaggerPowerAppsParser
             Console.ReadKey();
         }
 
-        private static string MangleSwagger(bool forBusinessUse, bool useImplicitFlow, string jsonFileName)
+        private static Dictionary<string, dynamic> GetNewDescriptions()
+        {
+            var listOfTypes = (from assemblyType in typeof(BaseEntityChangeSubscriptionNotificationDataContract).Assembly.GetTypes()
+                               where typeof(BaseEntityChangeSubscriptionNotificationDataContract).IsAssignableFrom(assemblyType)
+                               select assemblyType).ToArray();
+
+            Dictionary<string, dynamic> result = new Dictionary<string, dynamic>();
+            foreach (var type in listOfTypes)
+            {
+                string typeName = type.Name;
+                var typeDescription = GetTypeDescription(type);
+                result.Add(typeName, typeDescription);
+            }
+
+            return result;
+        }
+
+        private static Dictionary<string, dynamic> GetNewPaths()
+        {
+            var listOfTypes = (from assemblyType in typeof(BaseEntityChangeSubscriptionNotificationDataContract).Assembly.GetTypes()
+                               where typeof(BaseEntityChangeSubscriptionNotificationDataContract).IsAssignableFrom(assemblyType)
+                               select assemblyType).ToArray();
+
+            Dictionary<string, dynamic> result = new Dictionary<string, dynamic>();
+            foreach (var type in listOfTypes)
+            {
+                string path = $"/api/webhook/create/{type.Name}";
+                var triggerDescrtiption = GetPathDescriptionForTrigger(type);
+                result.Add(path, triggerDescrtiption);
+            }
+
+            return result;
+        }
+
+
+        private static dynamic GetPathDescriptionForTrigger(Type type)
+        {
+            string triggerDescriptionText = "";
+
+            var workflowDescriptionAttribute = typeof(WorkflowTriggerDescriptionAttribute);
+
+            var attributes = type.GetCustomAttributes(workflowDescriptionAttribute, true);
+
+            foreach (var attribute in attributes)
+            {
+                var description = attribute as WorkflowTriggerDescriptionAttribute;
+                if (description != null)
+                {
+                    triggerDescriptionText = description.Description;
+                }
+            }
+            //Trigger description
+            string triggerJson = $@"{{
+    ""x-ms-notification-content"": {{
+    ""description"": ""Webhook notification details"",
+    ""schema"": {{
+        ""$ref"": ""#/definitions/{type.Name}""
+    }}
+    }},
+    ""post"": {{
+    ""description"": ""Creates a Rezi Webhook"",
+    ""summary"": ""{triggerDescriptionText}"",
+    ""operationId"": ""webhook-trigger-{type.Name}"",
+    ""x-ms-trigger"": ""single"",
+    ""parameters"": [     
+        {{
+        ""name"": ""Request body of webhook"",
+        ""in"": ""body"",
+        ""description"": ""This is the request body of the Webhook"",
+        ""schema"": {{
+            ""$ref"": ""#/definitions/WebhookRequestBody""
+        }}
+        }}
+    ],
+    ""responses"": {{
+        ""201"": {{
+        ""description"": ""Created"",
+        ""schema"": {{
+            ""$ref"": ""#/definitions/WebhookCreationResponse""
+        }}
+        }}
+    }}
+    }}
+}}";
+
+            dynamic result = Newtonsoft.Json.JsonConvert.DeserializeObject(triggerJson);
+
+            return result;
+        }
+
+        private static dynamic GetTypeDescription(Type type)
+        {
+            dynamic result = new JObject();
+
+            result.type = "object";
+            result.properties = new JObject();
+            foreach (var property in type.GetProperties())
+            {
+                result.properties[property.Name] = GetPropertyDescription(property.PropertyType);
+
+            }
+
+            return result;
+        }
+
+        private static dynamic GetPropertyDescription(Type property)
+        {
+            string typeName = GetTypeNameFromProperty(property);
+
+            dynamic propertyDescription = new JObject();
+            propertyDescription.type = typeName;
+            if (property == typeof(long))
+            {
+                propertyDescription.format = "int64";
+            }
+
+            if (property == typeof(DateTime))
+            {
+                propertyDescription.format = "date-time";
+            }
+
+            if (propertyDescription.type == "array")
+            {
+                if (property.IsGenericList())
+                {
+                    propertyDescription.items = GetPropertyDescription(property.GetGenericArguments().Single());
+                }
+                else
+                {
+                    propertyDescription.items = GetPropertyDescription(property.GetElementType());
+                }
+            }
+
+            if (propertyDescription.type == "object")
+            {
+                propertyDescription = GetTypeDescription(property);
+            }
+
+            return propertyDescription;
+        }
+
+        private static dynamic GetTypeNameFromProperty(Type propertyType)
+        {
+            string typeName = propertyType.Name;
+            if (propertyType == typeof(string))
+            {
+                return "string";
+            }
+
+            if (propertyType == typeof(long) || propertyType == typeof(int))
+            {
+                return "integer";
+            }
+
+            if (propertyType == typeof(bool))
+            {
+                return "boolean";
+            }
+
+            if (propertyType == typeof(DateTime))
+            {
+                return "string";
+            }
+
+            if (propertyType.IsArray || propertyType.IsGenericList())
+            {
+                return "array";
+
+                /*
+                 "type": "array",
+					"items": {
+						"format": "int64",
+						"type": "integer"
+					}
+                 */
+            }
+
+            if (Nullable.GetUnderlyingType(propertyType) != null)
+            {
+                return GetTypeNameFromProperty(Nullable.GetUnderlyingType(propertyType));
+            }
+
+            return "object";
+        }
+
+
+
+        private static string MangleSwagger(bool forBusinessUse, bool useImplicitFlow, string jsonFileName, Dictionary<string, dynamic> AddPaths = null, Dictionary<string, dynamic> AddDefinitions = null)
         {
             string environmentName = GetEnvironmentNameFromSwaggerURL(jsonFileName);
             Uri fileParamUri = new Uri(jsonFileName);
@@ -67,10 +265,13 @@ namespace ReziSwaggerPowerAppsParser
             listOfEndpointsToRemove.AddRange(nonPowerAppsCompatibleEndpoints);
             listOfEndpointsToRemove.AddRange(sensitiveEndpoints);
 
+            AddNewEndpointsAndPaths(swaggerDoc, AddPaths, AddDefinitions);
+
             RemoveEndpoints(swaggerDoc, listOfEndpointsToKeep, listOfEndpointsToRemove, null, false);
+
             List<string> remainingPathKeys = ((System.Collections.Generic.IDictionary<string, Newtonsoft.Json.Linq.JToken>)swaggerDoc.paths).Keys.ToList();
 
-            RemoveUnreferencedDataContracts(swaggerDoc);
+            //RemoveUnreferencedDataContracts(swaggerDoc);
 
             SetSecurity(swaggerDoc, environmentName, forBusinessUse, useImplicitFlow);
 
@@ -83,6 +284,28 @@ namespace ReziSwaggerPowerAppsParser
             return modifiedSwaggerFile;
         }
 
+        private static void AddNewEndpointsAndPaths(dynamic swaggerDoc, Dictionary<string, dynamic> addPaths, Dictionary<string, dynamic> addDefinitions)
+        {
+
+            if (addPaths != null)
+            {
+                var paths = ((System.Collections.Generic.IDictionary<string, Newtonsoft.Json.Linq.JToken>)swaggerDoc.paths);
+                foreach (var newPathItemKey in addPaths.Keys)
+                {
+                    paths.Add(newPathItemKey, addPaths[newPathItemKey]);
+                }
+            }
+
+            if (addDefinitions != null)
+            {
+                var definitions = ((System.Collections.Generic.IDictionary<string, Newtonsoft.Json.Linq.JToken>)swaggerDoc.definitions);
+                foreach (var newDefinitionKey in addDefinitions.Keys)
+                {
+                    definitions.Add(newDefinitionKey, addDefinitions[newDefinitionKey]);
+                }
+            }
+
+        }
 
         private static string GetEnvironmentNameFromSwaggerURL(string jsonFileName)
         {
@@ -168,27 +391,30 @@ namespace ReziSwaggerPowerAppsParser
 
                     foreach (var verb in path)
                     {
-                        foreach (var operation in verb)
+                        if (!((Newtonsoft.Json.Linq.JProperty)((Newtonsoft.Json.Linq.JContainer)verb).First).Name.StartsWith("x-"))
                         {
-                            JArray parameters = operation.Value.parameters as JArray;
-
-                            //Set the security to require the needed scope
-                            JArray security = operation.Value.security as JArray;
-
-                            security.Clear();
-
-                            security.Add(JObject.Parse(@"{""dezrezOauth2Implicit"": [""impersonate_any_agency""]}"));
-
-                            if (!parameters.Any(p => ((string)p["name"]).ToLower() == "agencyid"))
+                            foreach (var operation in verb)
                             {
-                                //We need to add the agencyId parameter
-                                parameters.Add(JToken.Parse(@"{""name"": ""agencyId"",""in"": ""query"",""required"": true,""type"": ""integer"", ""format"": ""int64""}"));
-                            }
+                                JArray parameters = operation.Value.parameters as JArray;
 
-                            if (!parameters.Any(p => ((string)p["name"]).ToLower() == "branchid"))
-                            {
-                                //We need to add the agencyId parameter
-                                parameters.Add(JToken.Parse(@"{""name"": ""branchid"",""in"": ""query"",""required"": false,""type"": ""integer"", ""format"": ""int64""}"));
+                                //Set the security to require the needed scope
+                                JArray security = operation.Value.security as JArray;
+
+                                security.Clear();
+
+                                security.Add(JObject.Parse(@"{""dezrezOauth2Implicit"": [""impersonate_any_agency""]}"));
+
+                                if (!parameters.Any(p => ((string)p["name"]).ToLower() == "agencyid"))
+                                {
+                                    //We need to add the agencyId parameter
+                                    parameters.Add(JToken.Parse(@"{""name"": ""agencyId"",""in"": ""query"",""required"": true,""type"": ""integer"", ""format"": ""int64""}"));
+                                }
+
+                                if (!parameters.Any(p => ((string)p["name"]).ToLower() == "branchid"))
+                                {
+                                    //We need to add the agencyId parameter
+                                    parameters.Add(JToken.Parse(@"{""name"": ""branchid"",""in"": ""query"",""required"": false,""type"": ""integer"", ""format"": ""int64""}"));
+                                }
                             }
                         }
                     }
@@ -354,7 +580,7 @@ namespace ReziSwaggerPowerAppsParser
             {
                 var pathItem = swaggerDoc.paths[pathKey];
 
-                foreach (var verbKey in ((System.Collections.Generic.IDictionary<string, Newtonsoft.Json.Linq.JToken>)pathItem).Keys)
+                foreach (var verbKey in ((System.Collections.Generic.IDictionary<string, Newtonsoft.Json.Linq.JToken>)pathItem).Keys.Where(k => !k.StartsWith("x-")))
                 {
                     var operation = pathItem[verbKey];
                     string operationId = operation.operationId;
@@ -461,5 +687,12 @@ namespace ReziSwaggerPowerAppsParser
 		}
 	}
          */
+    }
+    public static class ExtensionMethodsList
+    {
+        public static bool IsGenericList(this Type o)
+        {
+            return (o.IsGenericType && (o.GetGenericTypeDefinition() == typeof(List<>)));
+        }
     }
 }
