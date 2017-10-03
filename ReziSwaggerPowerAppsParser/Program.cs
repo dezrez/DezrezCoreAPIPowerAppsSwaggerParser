@@ -92,7 +92,8 @@ namespace ReziSwaggerPowerAppsParser
                 }
             }
             //Trigger description
-            string triggerJson = $@"{{
+            string triggerJson = $@"
+{{
     ""x-ms-notification-content"": {{
     ""description"": ""Webhook notification details"",
     ""schema"": {{
@@ -115,15 +116,18 @@ namespace ReziSwaggerPowerAppsParser
         }}
     ],
     ""responses"": {{
-        ""201"": {{
-        ""description"": ""Created"",
-        ""schema"": {{
-            ""type"":""object""
-        }}
-        }}
-    }}
-    }}
-}}";
+                        ""201"": {{
+                            ""description"": ""Created"",
+                            ""schema"": {{
+                                            ""type"":""object""
+                                        }}
+                                   }}
+                   }},
+    ""security"": [{{
+                    ""dezrezOauth2Implicit"": [""impersonate_user""]
+                }}]
+}}
+                    }}";
 
             dynamic result = Newtonsoft.Json.JsonConvert.DeserializeObject(triggerJson);
 
@@ -391,9 +395,10 @@ namespace ReziSwaggerPowerAppsParser
 
                     foreach (var verb in path)
                     {
-                        if (!((Newtonsoft.Json.Linq.JProperty)((Newtonsoft.Json.Linq.JContainer)verb).First).Name.StartsWith("x-"))
+
+                        foreach (var operation in verb)
                         {
-                            foreach (var operation in verb)
+                            if (!((JProperty)operation).Name.StartsWith("x-"))
                             {
                                 JArray parameters = operation.Value.parameters as JArray;
 
