@@ -541,7 +541,7 @@ namespace ReziSwaggerPowerAppsParser
             dontAddContractsInThisList = dontAddContractsInThisList ?? new List<string>();
             List<string> contractsReferencedByThisContract = new List<string>();
             endpointReferencedContract = endpointReferencedContract.Replace("#/definitions/", "");
-            
+
             var contract = swaggerDoc.definitions[endpointReferencedContract];
 
             foreach (var propertyInfo in contract.properties)
@@ -606,15 +606,14 @@ namespace ReziSwaggerPowerAppsParser
             {
                 var pathItem = swaggerDoc.paths[pathKey];
 
-                foreach (var verbKey in ((System.Collections.Generic.IDictionary<string, Newtonsoft.Json.Linq.JToken>)pathItem).Keys.Where(k => !k.StartsWith("x-")))
+                foreach (var verbKey in ((System.Collections.Generic.IDictionary<string, Newtonsoft.Json.Linq.JToken>)pathItem).Keys)//.Where(k => !k.StartsWith("x-")))
                 {
                     var operation = pathItem[verbKey];
-                    string operationId = operation.operationId;
-                    foreach (var parameter in operation.parameters)
+                    if (verbKey == "x-ms-notification-content")
                     {
-                        if (parameter["schema"] != null)
+                        if (operation["schema"] != null)
                         {
-                            JObject schemaObject = parameter.schema as JObject;
+                            JObject schemaObject = operation.schema as JObject;
                             if (schemaObject["$ref"] != null)
                             {
                                 string contractReference = schemaObject["$ref"].ToString();
@@ -625,9 +624,9 @@ namespace ReziSwaggerPowerAppsParser
                                 catch { }
                             }
 
-                            if((string)parameter.schema.type == "array")
+                            if ((string)operation.schema.type == "array")
                             {
-                                JObject arrayItem = parameter.schema.items as JObject;
+                                JObject arrayItem = operation.schema.items as JObject;
 
                                 if (arrayItem["$ref"] != null)
                                 {
@@ -635,53 +634,84 @@ namespace ReziSwaggerPowerAppsParser
                                 }
                             }
                         }
-
                     }
-                    //Responses collection may contain references to needed data contracts
-                    foreach (var operationResponse in operation.responses)
+                    else
                     {
-                        if (operationResponse.Value.schema != null)
+                        
+                        string operationId = operation.operationId;
+                        foreach (var parameter in operation.parameters)
                         {
-                            string contractReference = null;
-                            JObject propertyValue = null;
-                            switch ((string)operationResponse.Value.schema.type)
+                            if (parameter["schema"] != null)
                             {
-                                case "object":
-                                    propertyValue = operationResponse.Value.schema as JObject;
-
-                                    if (propertyValue["$ref"] != null)
+                                JObject schemaObject = parameter.schema as JObject;
+                                if (schemaObject["$ref"] != null)
+                                {
+                                    string contractReference = schemaObject["$ref"].ToString();
+                                    try
                                     {
-                                        contractReference = propertyValue["$ref"].ToString();
+                                        referencesToKeep.Add(contractReference.Replace("#/definitions/", ""));
                                     }
-                                    break;
+                                    catch { }
+                                }
 
-                                case "array":
-                                    JObject arrayItem = operationResponse.Value.schema.items as JObject;
+                                if ((string)parameter.schema.type == "array")
+                                {
+                                    JObject arrayItem = parameter.schema.items as JObject;
 
                                     if (arrayItem["$ref"] != null)
                                     {
-                                        contractReference = arrayItem["$ref"].ToString();
+                                        referencesToKeep.Add(arrayItem["$ref"].ToString().Replace("#/definitions/", ""));
                                     }
-                                    break;
-                                default:
-
-
-                                    propertyValue = operationResponse.Value.schema as JObject;
-                                    if (propertyValue["$ref"] != null)
-                                    {
-                                        contractReference = propertyValue["$ref"].ToString();
-                                    }
-                                    break;
-
-                            }
-
-                            if (contractReference != null)
-                            {
-                                referencesToKeep.Add(contractReference.Replace("#/definitions/", ""));
+                                }
                             }
 
                         }
+                        //Responses collection may contain references to needed data contracts
+                        foreach (var operationResponse in operation.responses)
+                        {
+                            if (operationResponse.Value.schema != null)
+                            {
+                                string contractReference = null;
+                                JObject propertyValue = null;
+                                switch ((string)operationResponse.Value.schema.type)
+                                {
+                                    case "object":
+                                        propertyValue = operationResponse.Value.schema as JObject;
 
+                                        if (propertyValue["$ref"] != null)
+                                        {
+                                            contractReference = propertyValue["$ref"].ToString();
+                                        }
+                                        break;
+
+                                    case "array":
+                                        JObject arrayItem = operationResponse.Value.schema.items as JObject;
+
+                                        if (arrayItem["$ref"] != null)
+                                        {
+                                            contractReference = arrayItem["$ref"].ToString();
+                                        }
+                                        break;
+                                    default:
+
+
+                                        propertyValue = operationResponse.Value.schema as JObject;
+                                        if (propertyValue["$ref"] != null)
+                                        {
+                                            contractReference = propertyValue["$ref"].ToString();
+                                        }
+                                        break;
+
+                                }
+
+                                if (contractReference != null)
+                                {
+                                    referencesToKeep.Add(contractReference.Replace("#/definitions/", ""));
+                                }
+
+                            }
+
+                        }
                     }
                 }
             }
