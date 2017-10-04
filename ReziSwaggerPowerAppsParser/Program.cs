@@ -40,6 +40,11 @@ namespace ReziSwaggerPowerAppsParser
             Console.ReadKey();
         }
 
+        static void Log(string logEntry)
+        {
+            System.IO.File.AppendAllText("c:\\PowerAppsManglerLogs.txt", $"{logEntry}\r\n");
+        }
+
         private static Dictionary<string, dynamic> GetNewDescriptions()
         {
             var listOfTypes = (from assemblyType in typeof(BaseEntityChangeSubscriptionNotificationDataContract).Assembly.GetTypes()
@@ -265,6 +270,7 @@ namespace ReziSwaggerPowerAppsParser
 
             List<string> listOfEndpointsToRemove = new List<string>(new[] { "/api/admin", "/api/documentgeneration/", "/api/locale/", "/api/chat/", "/api/Job/", "/api/todo", "api/Negotiator/" });
 
+
             //Always exclude endpoints that are not compatible with powerapps for some reason
             listOfEndpointsToRemove.AddRange(nonPowerAppsCompatibleEndpoints);
             listOfEndpointsToRemove.AddRange(sensitiveEndpoints);
@@ -441,6 +447,7 @@ namespace ReziSwaggerPowerAppsParser
                 if (!ShouldBeIncluded(includeUrlPrefixes, excludeUrlPrefixes, pathKey))
                 {
                     JObject pathObject = swaggerDoc.paths as JObject;
+                    Log($"Removing path {pathKey}");
                     pathObject.Property(pathKey).Remove();
                     continue;
                 }
@@ -504,7 +511,7 @@ namespace ReziSwaggerPowerAppsParser
             //At this point, all the data contract references that are being referenced directly from the endpoint are in the hashedset, referencesToKeep.
             //We now need to recursivley look at those data contracts to see if the reference any other data contracts, to get a complete list of the contracts we need to keep.
 
-            List<string> definitionKeys = ((System.Collections.Generic.IDictionary<string, Newtonsoft.Json.Linq.JToken>)swaggerDoc.definitions).Keys.ToList();
+            //List<string> definitionKeys = ((System.Collections.Generic.IDictionary<string, Newtonsoft.Json.Linq.JToken>)swaggerDoc.definitions).Keys.ToList();
 
             List<string> contractsReferencedByOtherContracts = new List<string>();
 
@@ -522,18 +529,19 @@ namespace ReziSwaggerPowerAppsParser
             {
                 if (!allContractsToKeep.Contains(contractName))
                 {
+                    Log($"Removing {contractName}");
                     definitionsObject.Property(contractName).Remove();
 
                 }
             }
         }
 
-        private static IEnumerable<string> GetContractReferencesUsedByThisContractReference(string endpointReferencedContract, dynamic swaggerDoc, List<string> referencesAlreadyAccountedFor = null)
+        private static IEnumerable<string> GetContractReferencesUsedByThisContractReference(string endpointReferencedContract, dynamic swaggerDoc, List<string> dontAddContractsInThisList = null)
         {
-            referencesAlreadyAccountedFor = referencesAlreadyAccountedFor ?? new List<string>();
-
-            List<string> contractsReferencedByOtherContract = new List<string>();
+            dontAddContractsInThisList = dontAddContractsInThisList ?? new List<string>();
+            List<string> contractsReferencedByThisContract = new List<string>();
             endpointReferencedContract = endpointReferencedContract.Replace("#/definitions/", "");
+            
             var contract = swaggerDoc.definitions[endpointReferencedContract];
 
             foreach (var propertyInfo in contract.properties)
@@ -543,16 +551,15 @@ namespace ReziSwaggerPowerAppsParser
                 if (propertyInfo.Value.type == "object")
                 {
 
-
                     if (propertyValue["$ref"] != null)
                     {
                         string contractReference = propertyValue["$ref"].ToString();
                         string standardContractReference = contractReference.Replace("#/definitions/", "");
-                        if (!contractsReferencedByOtherContract.Union(referencesAlreadyAccountedFor).ToList().Contains(standardContractReference))
-                        {
-                            contractsReferencedByOtherContract.Add(standardContractReference);
-                            contractsReferencedByOtherContract.AddRange(GetContractReferencesUsedByThisContractReference(contractReference, swaggerDoc, contractsReferencedByOtherContract.Union(referencesAlreadyAccountedFor).ToList()));
-                        }
+                        if (dontAddContractsInThisList.Contains(standardContractReference)) continue;
+                        contractsReferencedByThisContract.Add(standardContractReference);
+                        dontAddContractsInThisList.Add(standardContractReference);
+                        contractsReferencedByThisContract.AddRange(GetContractReferencesUsedByThisContractReference(contractReference, swaggerDoc, dontAddContractsInThisList));
+
                         continue;
                     }
                 }
@@ -565,11 +572,11 @@ namespace ReziSwaggerPowerAppsParser
                     {
                         string contractReference = arrayItem["$ref"].ToString();
                         string standardContractReference = contractReference.Replace("#/definitions/", "");
-                        if (!contractsReferencedByOtherContract.Union(referencesAlreadyAccountedFor).ToList().Contains(standardContractReference))
-                        {
-                            contractsReferencedByOtherContract.Add(standardContractReference);
-                            contractsReferencedByOtherContract.AddRange(GetContractReferencesUsedByThisContractReference(contractReference, swaggerDoc, contractsReferencedByOtherContract.Union(referencesAlreadyAccountedFor).ToList()));
-                        }
+                        if (dontAddContractsInThisList.Contains(standardContractReference)) continue;
+                        contractsReferencedByThisContract.Add(standardContractReference);
+                        dontAddContractsInThisList.Add(standardContractReference);
+                        contractsReferencedByThisContract.AddRange(GetContractReferencesUsedByThisContractReference(contractReference, swaggerDoc, dontAddContractsInThisList));
+
                         continue;
                     }
                 }
@@ -578,17 +585,17 @@ namespace ReziSwaggerPowerAppsParser
                 {
                     string contractReference = propertyValue["$ref"].ToString();
                     string standardContractReference = contractReference.Replace("#/definitions/", "");
-                    if (!contractsReferencedByOtherContract.Union(referencesAlreadyAccountedFor).ToList().Contains(standardContractReference))
-                    {
-                        contractsReferencedByOtherContract.Add(standardContractReference);
-                        contractsReferencedByOtherContract.AddRange(GetContractReferencesUsedByThisContractReference(contractReference, swaggerDoc, contractsReferencedByOtherContract.Union(referencesAlreadyAccountedFor).ToList()));
-                    }
+                    if (dontAddContractsInThisList.Contains(standardContractReference)) continue;
+                    contractsReferencedByThisContract.Add(standardContractReference);
+                    dontAddContractsInThisList.Add(standardContractReference);
+                    contractsReferencedByThisContract.AddRange(GetContractReferencesUsedByThisContractReference(contractReference, swaggerDoc, dontAddContractsInThisList));
+
                     continue;
                 }
 
             }
 
-            return contractsReferencedByOtherContract;
+            return contractsReferencedByThisContract;
         }
 
         private static HashSet<string> GetContractReferences(dynamic swaggerDoc, List<string> pathKeys)
@@ -616,6 +623,16 @@ namespace ReziSwaggerPowerAppsParser
                                     referencesToKeep.Add(contractReference.Replace("#/definitions/", ""));
                                 }
                                 catch { }
+                            }
+
+                            if((string)parameter.schema.type == "array")
+                            {
+                                JObject arrayItem = parameter.schema.items as JObject;
+
+                                if (arrayItem["$ref"] != null)
+                                {
+                                    referencesToKeep.Add(arrayItem["$ref"].ToString().Replace("#/definitions/", ""));
+                                }
                             }
                         }
 
