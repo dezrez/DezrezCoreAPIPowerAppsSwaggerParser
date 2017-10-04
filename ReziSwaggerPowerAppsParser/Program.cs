@@ -25,9 +25,9 @@ namespace ReziSwaggerPowerAppsParser
 
             //Add the definition of the contract
 
-            bool forBusinessUse = true;//Signifies if we'll be able to impersonate all agencies etc.
+            bool forBusinessUse = false; ;//Signifies if we'll be able to impersonate all agencies etc.
 
-            bool useImplicitFlow = true;//WHen forBusinessUse = true, specifies to use implicitFlow anyway, instead of using client flow (as client flow doesnt work yet in PowerApps)
+            bool useImplicitFlow = false;//WHen forBusinessUse = true, specifies to use implicitFlow anyway, instead of using client flow (as client flow doesnt work yet in PowerApps)
 
             string jsonFileName = args[0];
 
@@ -93,7 +93,7 @@ namespace ReziSwaggerPowerAppsParser
                 var description = attribute as WorkflowTriggerDescriptionAttribute;
                 if (description != null)
                 {
-                    triggerDescriptionText = description.Description;
+                    triggerDescriptionText = description.Description.Replace(".", "");
                 }
             }
             //Trigger description
@@ -108,17 +108,27 @@ namespace ReziSwaggerPowerAppsParser
     ""post"": {{
     ""description"": ""Creates a Rezi Webhook"",
     ""summary"": ""{triggerDescriptionText}"",
-    ""operationId"": ""webhook-trigger-{type.Name}"",
+    ""operationId"": ""{type.Name}"",
     ""x-ms-trigger"": ""single"",
     ""parameters"": [     
-        {{
-        ""name"": ""Request body of webhook"",
-        ""in"": ""body"",
-        ""description"": ""This is the request body of the Webhook"",
-        ""schema"": {{
-            ""$ref"": ""#/definitions/Dezrez.Core.DataContracts.External.Api.Webhook.CreateWebhookDataContract""
-        }}
-        }}
+            {{
+            ""name"": ""Request body of webhook"",
+            ""in"": ""body"",
+            ""description"": ""This is the request body of the Webhook"",
+            ""schema"": {{
+                ""$ref"": ""#/definitions/Dezrez.Core.DataContracts.External.Api.Webhook.CreateWebhookDataContract""
+            }}
+            }},
+{{
+					""name"": ""Rezi-Api-Version"",
+					""in"": ""header"",
+					""description"": ""Version"",
+					""required"": true,
+					""type"": ""string"",
+					""default"": ""1.0"",
+					""maxItems"": 1,
+					""minItems"": 1
+				}}
     ],
     ""responses"": {{
                         ""201"": {{
@@ -262,13 +272,17 @@ namespace ReziSwaggerPowerAppsParser
 
             dynamic swaggerDoc = JObject.Parse(File.ReadAllText(modifiedSwaggerFile));
 
+            FixCreateWebhookContract(swaggerDoc);
+
             List<string> nonPowerAppsCompatibleEndpoints = new List<string>(new[] { "/api/admin", "/api/reporting/" });
 
             List<string> sensitiveEndpoints = new List<string>(new[] { "/api/people/{id}/accounts" });
 
-            List<string> listOfEndpointsToKeep = new List<string>(new[] { "/api/admin/system/ListAgencies", "/api/", "/api/Job", "api/Negotiator", "api/people/sendnotification", "/api/inboundlead/create", "/api/featureprovisioning/enrollagency", "api/agency/apikey", "/api/group/addgroup", "/api/job/SendSystemEmail" });
+            List<string> listOfEndpointsToKeep, listOfEndpointsToRemove;
 
-            List<string> listOfEndpointsToRemove = new List<string>(new[] { "/api/admin", "/api/documentgeneration/", "/api/locale/", "/api/chat/", "/api/Job/", "/api/todo", "api/Negotiator/" });
+            bool discardNotSpecified = false;
+
+            CountrywideDemoConfig(out listOfEndpointsToKeep, out listOfEndpointsToRemove, out discardNotSpecified);
 
 
             //Always exclude endpoints that are not compatible with powerapps for some reason
@@ -277,7 +291,7 @@ namespace ReziSwaggerPowerAppsParser
 
             AddNewEndpointsAndPaths(swaggerDoc, AddPaths, AddDefinitions);
 
-            RemoveEndpoints(swaggerDoc, listOfEndpointsToKeep, listOfEndpointsToRemove, null, false);
+            RemoveEndpoints(swaggerDoc, listOfEndpointsToKeep, listOfEndpointsToRemove, null, discardNotSpecified);
 
             List<string> remainingPathKeys = ((System.Collections.Generic.IDictionary<string, Newtonsoft.Json.Linq.JToken>)swaggerDoc.paths).Keys.ToList();
 
@@ -292,6 +306,27 @@ namespace ReziSwaggerPowerAppsParser
             File.WriteAllText(modifiedSwaggerFile, File.ReadAllText(modifiedSwaggerFile).Replace("Specifies which version of the API to call", "Version"));
 
             return modifiedSwaggerFile;
+        }
+
+        private static void FixCreateWebhookContract(dynamic swaggerDoc)
+        {
+            swaggerDoc.definitions["Dezrez.Core.DataContracts.External.Api.Webhook.CreateWebhookDataContract"].properties["WebhookUrl"]["x-ms-notification-url"] = true;
+            swaggerDoc.definitions["Dezrez.Core.DataContracts.External.Api.Webhook.CreateWebhookDataContract"].properties["WebhookUrl"]["x-ms-visibility"] = "internal";
+
+        }
+
+        private static void BaseConfiguration(out List<string> listOfEndpointsToKeep, out List<string> listOfEndpointsToRemove, out bool discardNotSpecified)
+        {
+            listOfEndpointsToKeep = new List<string>(new[] { "/api/admin/system/ListAgencies", "/api/", "/api/Job", "api/Negotiator", "api/people/sendnotification", "/api/inboundlead/create", "/api/featureprovisioning/enrollagency", "api/agency/apikey", "/api/group/addgroup", "/api/job/SendSystemEmail" });
+            listOfEndpointsToRemove = new List<string>(new[] { "/api/admin", "/api/documentgeneration/", "/api/locale/", "/api/chat/", "/api/Job/", "/api/todo", "api/Negotiator/" });
+            discardNotSpecified = true;
+        }
+
+        private static void CountrywideDemoConfig(out List<string> listOfEndpointsToKeep, out List<string> listOfEndpointsToRemove, out bool discardNotSpecified)
+        {
+            listOfEndpointsToKeep = new List<string>(new[] { "/api/admin/system/ListAgencies", "/api/Job", "api/Negotiator", "api/people/sendnotification", "/api/inboundlead/create", "/api/featureprovisioning/enrollagency", "api/agency/apikey", "/api/group/addgroup", "/api/job/SendSystemEmail", "api/webhook" });
+            listOfEndpointsToRemove = new List<string>(new[] { "/api/admin", "/api/documentgeneration/", "/api/locale/", "/api/Chat/", "/api/Job/", "/api/todo", "api/Negotiator/", "api/coreplatformstate/", "api/digitalsignature/", "api/historicalprices/", "api/twitter", "peppermint/", "api/sync/", "/api/agency/updateportalcustomisation/", "api/analytics/", "api/cache/", "api/dashboard/", "api/Job", "api/legacy/", "api/list/stats/", "api/screenz/", "api/stats/", "api/teamsecurity/", "api/roomdescription/", "api/progressionchain/", "api/progression/" });
+            discardNotSpecified = true;
         }
 
         private static void AddNewEndpointsAndPaths(dynamic swaggerDoc, Dictionary<string, dynamic> addPaths, Dictionary<string, dynamic> addDefinitions)
@@ -433,7 +468,7 @@ namespace ReziSwaggerPowerAppsParser
             }
         }
 
-        private static void RemoveEndpoints(dynamic swaggerDoc, List<string> includeUrlPrefixes, List<string> excludeUrlPrefixes, List<string> includeOperationIdPrefixes, bool removeUnreferencedContracts)
+        private static void RemoveEndpoints(dynamic swaggerDoc, List<string> includeUrlPrefixes, List<string> excludeUrlPrefixes, List<string> includeOperationIdPrefixes, bool discardNotSpecified)
         {
             List<string> removedPaths = new List<string>();
             List<string> operationIdsToRemove = new List<string>();
@@ -444,7 +479,7 @@ namespace ReziSwaggerPowerAppsParser
             {
                 CleansePath((dynamic)swaggerDoc.paths[pathKey]);
 
-                if (!ShouldBeIncluded(includeUrlPrefixes, excludeUrlPrefixes, pathKey))
+                if (!ShouldBeIncluded(includeUrlPrefixes, excludeUrlPrefixes, pathKey, discardNotSpecified))
                 {
                     JObject pathObject = swaggerDoc.paths as JObject;
                     Log($"Removing path {pathKey}");
@@ -473,7 +508,7 @@ namespace ReziSwaggerPowerAppsParser
 
         }
 
-        private static bool ShouldBeIncluded(List<string> includeUrlPrefixes, List<string> excludeUrlPrefixes, string pathKey)
+        private static bool ShouldBeIncluded(List<string> includeUrlPrefixes, List<string> excludeUrlPrefixes, string pathKey, bool discardNotSpecified)
         {
 
             if (includeUrlPrefixes == null && excludeUrlPrefixes == null)
@@ -491,7 +526,12 @@ namespace ReziSwaggerPowerAppsParser
                 return pathKey.ToLower().Contains(pf.ToLower());
             });
 
-            if (matchesAtLeastOneInclude ^ matchesAtLeastOneExclude || !(matchesAtLeastOneExclude && matchesAtLeastOneInclude))
+            if (!matchesAtLeastOneExclude && !matchesAtLeastOneInclude)
+            {
+                return !discardNotSpecified;
+            }
+
+            if (matchesAtLeastOneInclude ^ matchesAtLeastOneExclude)
             {
                 return matchesAtLeastOneInclude;
             }
@@ -637,7 +677,7 @@ namespace ReziSwaggerPowerAppsParser
                     }
                     else
                     {
-                        
+
                         string operationId = operation.operationId;
                         foreach (var parameter in operation.parameters)
                         {
