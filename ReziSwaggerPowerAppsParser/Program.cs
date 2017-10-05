@@ -52,7 +52,7 @@ namespace ReziSwaggerPowerAppsParser
                                select assemblyType).ToArray();
 
             Dictionary<string, dynamic> result = new Dictionary<string, dynamic>();
-            foreach (var type in listOfTypes)
+            foreach (var type in listOfTypes.Where(t=>t!=typeof(BaseEntityChangeSubscriptionNotificationDataContract)))
             {
                 string typeName = type.Name;
                 var typeDescription = GetTypeDescription(type);
@@ -69,7 +69,7 @@ namespace ReziSwaggerPowerAppsParser
                                select assemblyType).ToArray();
 
             Dictionary<string, dynamic> result = new Dictionary<string, dynamic>();
-            foreach (var type in listOfTypes)
+            foreach (var type in listOfTypes.Where(t => t != typeof(BaseEntityChangeSubscriptionNotificationDataContract)))
             {
                 string path = $"/api/webhook/create/{type.Name}";
                 var triggerDescrtiption = GetPathDescriptionForTrigger(type);
@@ -127,7 +127,8 @@ namespace ReziSwaggerPowerAppsParser
 					""type"": ""string"",
 					""default"": ""1.0"",
 					""maxItems"": 1,
-					""minItems"": 1
+					""minItems"": 1,
+                    ""x-ms-visibility"":""internal""
 				}}
     ],
     ""responses"": {{
@@ -324,7 +325,7 @@ namespace ReziSwaggerPowerAppsParser
 
         private static void CountrywideDemoConfig(out List<string> listOfEndpointsToKeep, out List<string> listOfEndpointsToRemove, out bool discardNotSpecified)
         {
-            listOfEndpointsToKeep = new List<string>(new[] { "/api/admin/system/ListAgencies", "/api/Job", "api/Negotiator", "api/people/sendnotification", "/api/inboundlead/create", "/api/featureprovisioning/enrollagency", "api/agency/apikey", "/api/group/addgroup", "/api/job/SendSystemEmail", "api/webhook" });
+            listOfEndpointsToKeep = new List<string>(new[] { "/api/admin/system/ListAgencies", "/api/Job", "api/Negotiator", "api/people/sendnotification", "/api/inboundlead/create", "/api/featureprovisioning/enrollagency", "api/agency/apikey", "/api/group/addgroup", "/api/job/SendSystemEmail", "api/webhook", "api/document", "api/negotiator" });
             listOfEndpointsToRemove = new List<string>(new[] { "/api/admin", "/api/documentgeneration/", "/api/locale/", "/api/Chat/", "/api/Job/", "/api/todo", "api/Negotiator/", "api/coreplatformstate/", "api/digitalsignature/", "api/historicalprices/", "api/twitter", "peppermint/", "api/sync/", "/api/agency/updateportalcustomisation/", "api/analytics/", "api/cache/", "api/dashboard/", "api/Job", "api/legacy/", "api/list/stats/", "api/screenz/", "api/stats/", "api/teamsecurity/", "api/roomdescription/", "api/progressionchain/", "api/progression/" });
             discardNotSpecified = true;
         }
