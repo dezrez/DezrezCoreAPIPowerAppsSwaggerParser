@@ -25,9 +25,9 @@ namespace ReziSwaggerPowerAppsParser
 
             //Add the definition of the contract
 
-            bool forBusinessUse = false; ;//Signifies if we'll be able to impersonate all agencies etc.
+            bool forBusinessUse = false;//Signifies if we'll be able to impersonate all agencies etc.
 
-            bool useImplicitFlow = false;//WHen forBusinessUse = true, specifies to use implicitFlow anyway, instead of using client flow (as client flow doesnt work yet in PowerApps)
+            bool useImplicitFlow = true;//WHen forBusinessUse = true, specifies to use implicitFlow anyway, instead of using client flow (as client flow doesnt work yet in PowerApps)
 
             string jsonFileName = args[0];
 
@@ -52,7 +52,7 @@ namespace ReziSwaggerPowerAppsParser
                                select assemblyType).ToArray();
 
             Dictionary<string, dynamic> result = new Dictionary<string, dynamic>();
-            foreach (var type in listOfTypes.Where(t=>t!=typeof(BaseEntityChangeSubscriptionNotificationDataContract)))
+            foreach (var type in listOfTypes.Where(t => t != typeof(BaseEntityChangeSubscriptionNotificationDataContract)))
             {
                 string typeName = type.Name;
                 var typeDescription = GetTypeDescription(type);
@@ -64,19 +64,26 @@ namespace ReziSwaggerPowerAppsParser
 
         private static Dictionary<string, dynamic> GetNewPaths()
         {
-            var listOfTypes = (from assemblyType in typeof(BaseEntityChangeSubscriptionNotificationDataContract).Assembly.GetTypes()
-                               where typeof(BaseEntityChangeSubscriptionNotificationDataContract).IsAssignableFrom(assemblyType)
-                               select assemblyType).ToArray();
-
-            Dictionary<string, dynamic> result = new Dictionary<string, dynamic>();
-            foreach (var type in listOfTypes.Where(t => t != typeof(BaseEntityChangeSubscriptionNotificationDataContract)))
+            try
             {
-                string path = $"/api/webhook/create/{type.Name}";
-                var triggerDescrtiption = GetPathDescriptionForTrigger(type);
-                result.Add(path, triggerDescrtiption);
-            }
+                var listOfTypes = (from assemblyType in typeof(BaseEntityChangeSubscriptionNotificationDataContract).Assembly.GetTypes()
+                                   where typeof(BaseEntityChangeSubscriptionNotificationDataContract).IsAssignableFrom(assemblyType)
+                                   select assemblyType).ToArray();
 
-            return result;
+                Dictionary<string, dynamic> result = new Dictionary<string, dynamic>();
+                foreach (var type in listOfTypes.Where(t => t != typeof(BaseEntityChangeSubscriptionNotificationDataContract)))
+                {
+                    string path = $"/api/webhook/create/{type.Name}";
+                    var triggerDescrtiption = GetPathDescriptionForTrigger(type);
+                    result.Add(path, triggerDescrtiption);
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
         }
 
 
@@ -283,7 +290,7 @@ namespace ReziSwaggerPowerAppsParser
 
             bool discardNotSpecified = false;
 
-            CountrywideDemoConfig(out listOfEndpointsToKeep, out listOfEndpointsToRemove, out discardNotSpecified);
+            TestConfiguration(out listOfEndpointsToKeep, out listOfEndpointsToRemove, out discardNotSpecified);
 
 
             //Always exclude endpoints that are not compatible with powerapps for some reason
@@ -318,14 +325,23 @@ namespace ReziSwaggerPowerAppsParser
 
         private static void BaseConfiguration(out List<string> listOfEndpointsToKeep, out List<string> listOfEndpointsToRemove, out bool discardNotSpecified)
         {
-            listOfEndpointsToKeep = new List<string>(new[] { "/api/admin/system/ListAgencies", "/api/", "/api/Job", "api/Negotiator", "api/people/sendnotification", "/api/inboundlead/create", "/api/featureprovisioning/enrollagency", "api/agency/apikey", "/api/group/addgroup", "/api/job/SendSystemEmail" });
-            listOfEndpointsToRemove = new List<string>(new[] { "/api/admin", "/api/documentgeneration/", "/api/locale/", "/api/chat/", "/api/Job/", "/api/todo", "api/Negotiator/" });
+            listOfEndpointsToKeep = new List<string>(new[] { "/api/admin/system/ListAgencies", "/api/agency/branches", "/api/", "/api/Job", "api/Negotiator", "api/people/sendnotification", "/api/inboundlead/create", "/api/group/addgroup", "/api/job/SendSystemEmail" });
+            listOfEndpointsToRemove = new List<string>(new[] { "/api/admin", "/api/coreplatformstate", "/api/account", "/api/documentgeneration/", "/api/locale/", "/api/chat/", "/api/Job/", "/api/todo", "api/Negotiator/", "/api/featureprovisioning/enrollagency", "api/agency/apikey", "/api/agency/updateportalcustomisation", "/api/analytics", "/api/dashboard", "/api/invoice", "/api/accounting", "/api/deposit", "api/digitalsignature", "/api/posting", "/api/tax", "/api/locale/", "/api/Chat/", "/api/Job/", "/api/todo", "api/Negotiator/", "api/coreplatformstate/", "api/digitalsignature/", "api/historicalprices/", "api/twitter", "peppermint/", "api/sync/", "/api/agency/updateportalcustomisation/", "api/analytics/", "api/cache/", "api/dashboard/", "api/Job", "api/legacy/", "api/list/stats/", "api/screenz/", "api/stats/", "api/teamsecurity/", "api/roomdescription/", "api/progressionchain/", "api/progression/","/api/agency/accountmanager", "/api/enlistedfeature" , "/api/document/{id}/download", "/api/document/rename", "/api/document/setprivacy", "/api/document/{id}/savedescription", "/api/customtextdescription/distinctcustompropertydescriptions", "/api/credentials/", "/api/costdescription", "/api/ChargesDescription", "/api/branding/", "api/appointment/appointmentstatus", "api/CustomField", "api/featuredescription", "api/furnishingdescription"
+        });
+            discardNotSpecified = true;
+        }
+
+        private static void TestConfiguration(out List<string> listOfEndpointsToKeep, out List<string> listOfEndpointsToRemove, out bool discardNotSpecified)
+        {
+            listOfEndpointsToKeep = new List<string>(new[] { "/api/webhook/create", "/api/admin/system/ListAgencies", "/api/agency/branches", "/api/Job", "api/Negotiator", "api/people/sendnotification", "/api/inboundlead/create", "/api/group/addgroup", "/api/job/SendSystemEmail", "api/document" });
+            listOfEndpointsToRemove = new List<string>(new[] { "/api/admin", "/api/coreplatformstate", "/api/account", "/api/documentgeneration/", "/api/locale/", "/api/chat/", "/api/Job/", "/api/todo", "api/Negotiator/", "/api/featureprovisioning/enrollagency", "api/agency/apikey", "/api/agency/updateportalcustomisation", "/api/analytics", "/api/dashboard", "/api/invoice", "/api/accounting", "/api/deposit", "api/digitalsignature", "/api/posting", "/api/tax", "/api/locale/", "/api/Chat/", "/api/Job/", "/api/todo", "api/Negotiator/", "api/coreplatformstate/", "api/digitalsignature/", "api/historicalprices/", "api/twitter", "peppermint/", "api/sync/", "/api/agency/updateportalcustomisation/", "api/analytics/", "api/cache/", "api/dashboard/", "api/Job", "api/legacy/", "api/list/stats/", "api/screenz/", "api/stats/", "api/teamsecurity/", "api/roomdescription/", "api/progressionchain/", "api/progression/","/api/agency/accountmanager", "/api/enlistedfeature" , "/api/document/{id}/download", "/api/document/rename", "/api/document/setprivacy", "/api/document/{id}/savedescription", "/api/customtextdescription/distinctcustompropertydescriptions", "/api/credentials/", "/api/costdescription", "/api/ChargesDescription", "/api/branding/", "api/appointment/appointmentstatus", "api/CustomField", "api/featuredescription", "api/furnishingdescription"
+        });
             discardNotSpecified = true;
         }
 
         private static void CountrywideDemoConfig(out List<string> listOfEndpointsToKeep, out List<string> listOfEndpointsToRemove, out bool discardNotSpecified)
         {
-            listOfEndpointsToKeep = new List<string>(new[] { "/api/admin/system/ListAgencies", "/api/Job", "api/Negotiator", "api/people/sendnotification", "/api/inboundlead/create", "/api/featureprovisioning/enrollagency", "api/agency/apikey", "/api/group/addgroup", "/api/job/SendSystemEmail", "api/webhook", "api/document", "api/negotiator" });
+            listOfEndpointsToKeep = new List<string>(new[] { "/api/admin/system/ListAgencies", "/api/Job", "api/Negotiator", "api/people/sendnotification", "/api/inboundlead/create", "/api/featureprovisioning/enrollagency", "api/agency/apikey", "/api/group/addgroup", "/api/job/SendSystemEmail", "api/webhook", "api/document", "api/negotiator", "api/person", "api/group" });
             listOfEndpointsToRemove = new List<string>(new[] { "/api/admin", "/api/documentgeneration/", "/api/locale/", "/api/Chat/", "/api/Job/", "/api/todo", "api/Negotiator/", "api/coreplatformstate/", "api/digitalsignature/", "api/historicalprices/", "api/twitter", "peppermint/", "api/sync/", "/api/agency/updateportalcustomisation/", "api/analytics/", "api/cache/", "api/dashboard/", "api/Job", "api/legacy/", "api/list/stats/", "api/screenz/", "api/stats/", "api/teamsecurity/", "api/roomdescription/", "api/progressionchain/", "api/progression/" });
             discardNotSpecified = true;
         }
