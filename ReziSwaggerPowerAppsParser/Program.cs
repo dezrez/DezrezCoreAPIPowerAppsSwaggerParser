@@ -290,7 +290,7 @@ namespace ReziSwaggerPowerAppsParser
 
             bool discardNotSpecified = false;
 
-            TestConfiguration(out listOfEndpointsToKeep, out listOfEndpointsToRemove, out discardNotSpecified);
+            PreserveMostConfiguration(out listOfEndpointsToKeep, out listOfEndpointsToRemove, out discardNotSpecified);
 
 
             //Always exclude endpoints that are not compatible with powerapps for some reason
@@ -318,8 +318,8 @@ namespace ReziSwaggerPowerAppsParser
 
         private static void FixCreateWebhookContract(dynamic swaggerDoc)
         {
-            swaggerDoc.definitions["Dezrez.Core.DataContracts.External.Api.Webhook.CreateWebhookDataContract"].properties["WebhookUrl"]["x-ms-notification-url"] = true;
-            swaggerDoc.definitions["Dezrez.Core.DataContracts.External.Api.Webhook.CreateWebhookDataContract"].properties["WebhookUrl"]["x-ms-visibility"] = "internal";
+            swaggerDoc.definitions["CreateWebhookDataContract"].properties["WebhookUrl"]["x-ms-notification-url"] = true;
+            swaggerDoc.definitions["CreateWebhookDataContract"].properties["WebhookUrl"]["x-ms-visibility"] = "internal";
 
         }
 
@@ -329,6 +329,14 @@ namespace ReziSwaggerPowerAppsParser
             listOfEndpointsToRemove = new List<string>(new[] { "/api/admin", "/api/coreplatformstate", "/api/account", "/api/documentgeneration/", "/api/locale/", "/api/chat/", "/api/Job/", "/api/todo", "api/Negotiator/", "/api/featureprovisioning/enrollagency", "api/agency/apikey", "/api/agency/updateportalcustomisation", "/api/analytics", "/api/dashboard", "/api/invoice", "/api/accounting", "/api/deposit", "api/digitalsignature", "/api/posting", "/api/tax", "/api/locale/", "/api/Chat/", "/api/Job/", "/api/todo", "api/Negotiator/", "api/coreplatformstate/", "api/digitalsignature/", "api/historicalprices/", "api/twitter", "peppermint/", "api/sync/", "/api/agency/updateportalcustomisation/", "api/analytics/", "api/cache/", "api/dashboard/", "api/Job", "api/legacy/", "api/list/stats/", "api/screenz/", "api/stats/", "api/teamsecurity/", "api/roomdescription/", "api/progressionchain/", "api/progression/","/api/agency/accountmanager", "/api/enlistedfeature" , "/api/document/{id}/download", "/api/document/rename", "/api/document/setprivacy", "/api/document/{id}/savedescription", "/api/customtextdescription/distinctcustompropertydescriptions", "/api/credentials/", "/api/costdescription", "/api/ChargesDescription", "/api/branding/", "api/appointment/appointmentstatus", "api/CustomField", "api/featuredescription", "api/furnishingdescription"
         });
             discardNotSpecified = true;
+        }
+
+        private static void PreserveMostConfiguration(out List<string> listOfEndpointsToKeep, out List<string> listOfEndpointsToRemove, out bool discardNotSpecified)
+        {
+            listOfEndpointsToKeep = new List<string>();
+            listOfEndpointsToRemove = new List<string>();
+
+            discardNotSpecified = false;
         }
 
         private static void TestConfiguration(out List<string> listOfEndpointsToKeep, out List<string> listOfEndpointsToRemove, out bool discardNotSpecified)
@@ -527,6 +535,10 @@ namespace ReziSwaggerPowerAppsParser
 
         private static bool ShouldBeIncluded(List<string> includeUrlPrefixes, List<string> excludeUrlPrefixes, string pathKey, bool discardNotSpecified)
         {
+            if (!includeUrlPrefixes.Any() && !excludeUrlPrefixes.Any())
+            {
+                return true;
+            }
 
             if (includeUrlPrefixes == null && excludeUrlPrefixes == null)
             {
@@ -696,32 +708,35 @@ namespace ReziSwaggerPowerAppsParser
                     {
 
                         string operationId = operation.operationId;
-                        foreach (var parameter in operation.parameters)
+                        if (operation.parameters != null)
                         {
-                            if (parameter["schema"] != null)
+                            foreach (var parameter in operation.parameters)
                             {
-                                JObject schemaObject = parameter.schema as JObject;
-                                if (schemaObject["$ref"] != null)
+                                if (parameter["schema"] != null)
                                 {
-                                    string contractReference = schemaObject["$ref"].ToString();
-                                    try
+                                    JObject schemaObject = parameter.schema as JObject;
+                                    if (schemaObject["$ref"] != null)
                                     {
-                                        referencesToKeep.Add(contractReference.Replace("#/definitions/", ""));
+                                        string contractReference = schemaObject["$ref"].ToString();
+                                        try
+                                        {
+                                            referencesToKeep.Add(contractReference.Replace("#/definitions/", ""));
+                                        }
+                                        catch { }
                                     }
-                                    catch { }
+
+                                    if ((string)parameter.schema.type == "array")
+                                    {
+                                        JObject arrayItem = parameter.schema.items as JObject;
+
+                                        if (arrayItem["$ref"] != null)
+                                        {
+                                            referencesToKeep.Add(arrayItem["$ref"].ToString().Replace("#/definitions/", ""));
+                                        }
+                                    }
                                 }
 
-                                if ((string)parameter.schema.type == "array")
-                                {
-                                    JObject arrayItem = parameter.schema.items as JObject;
-
-                                    if (arrayItem["$ref"] != null)
-                                    {
-                                        referencesToKeep.Add(arrayItem["$ref"].ToString().Replace("#/definitions/", ""));
-                                    }
-                                }
                             }
-
                         }
                         //Responses collection may contain references to needed data contracts
                         foreach (var operationResponse in operation.responses)

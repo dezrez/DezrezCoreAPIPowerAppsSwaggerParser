@@ -32,8 +32,8 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Dezrez.Core.DataContracts.External">
-      <HintPath>directReferences\Dezrez.Core.DataContracts.External.dll</HintPath>
+    <Reference Include="Dezrez.Core.DataContracts.External, Version=1.0.0.0, Culture=neutral, PublicKeyToken=dc481d830e54ec2d, processorArchitecture=MSIL">
+      <HintPath>..\packages\Dezrez.Core.DataContracts.External.1.2018622.2\lib\Dezrez.Core.DataContracts.External.dll</HintPath>
     </Reference>
     <Reference Include="Dezrez.Core.DataContracts.Internal">
       <HintPath>directReferences\Dezrez.Core.DataContracts.Internal.dll</HintPath>
@@ -41,11 +41,20 @@
     <Reference Include="Dezrez.Core.Enums">
       <HintPath>directReferences\Dezrez.Core.Enums.dll</HintPath>
     </Reference>
-    <Reference Include="Dezrez.Rezi.Domain">
-      <HintPath>directReferences\Dezrez.Rezi.Domain.dll</HintPath>
+    <Reference Include="Dezrez.Rezi.Domain, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Dezrez.Rezi.Domain.Enums.1.2018622.5\lib\Dezrez.Rezi.Domain.dll</HintPath>
+    </Reference>
+    <Reference Include="Dezrez.Rezi.Domain.Enums, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Dezrez.Rezi.Domain.Enums.1.2018622.5\lib\Dezrez.Rezi.Domain.Enums.dll</HintPath>
+    </Reference>
+    <Reference Include="Iesi.Collections">
+      <HintPath>directReferences\Iesi.Collections.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=10.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\packages\Newtonsoft.Json.10.0.2\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="NHibernate">
+      <HintPath>directReferences\NHibernate.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
